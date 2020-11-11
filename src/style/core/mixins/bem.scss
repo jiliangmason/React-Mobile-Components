@@ -1,0 +1,141 @@
+@import '../functions/string';
+
+$--namespace: 'zyx';
+$--block-separator: '-';
+$--element-separator: '__';
+$--modifier-separator: '--';
+$--keyframes-separator: '_';
+
+// 是否包含Modifier
+@function contains-modifier($selector) {
+    @return str-contains(str-selector($selector), $--modifier-separator);
+}
+
+// 是否包含Element
+@function contains-element($selector) {
+    @return str-contains(str-selector($selector), $--element-separator);
+}
+
+// 获取块名 .zyx-button__content => zyx-button
+@function get-block($selector) {
+    $selector: str-selector($selector);
+    $parent: str-slice($selector, str-index-reverse($selector, '.'));
+    $start: -2;
+    @if contains-element($parent) {
+        $start: str-index($parent, $--element-separator) - 1;
+    }
+    @else if contains-modifier($parent) {
+        $start: str-index($parent, $--modifier-separator) - 1;
+    }
+    $block: str-slice($parent, 0, $start);
+    @return $block;
+}
+
+// 获取节点  比如 xyz-button &表示父类 组合成一个完整类目
+@function get-elements($elements) {
+    $result: '';
+    $block: get-block(&);
+    $selector: if(contains-modifier(&), get-block(&), &); // xyz-button--danger => xyz-button  xyz-button__active => xyz-button__active
+    @each $unit in $elements { // get-elements(danger, active)
+        $element: selector-append($selector, $--element-separator + $unit); // selector-append(".warning", "__a") => .warning__a
+        // xyz-button =》 xyz-button__danger
+        @if contains-element($selector) { // xyz-button__active
+            $element: selector-nest($selector, selector-append($block, $--element-separator + $unit)) // selector-nest(".warning", "alert", "div") =>  .warning div, alert div
+            // .xyz-button__active .xyz-button__danger  $block = xyz-button
+        }
+        $result: $result + $element + ','; // xyz-button__active, xyz-button__danger
+    }
+    @return $result;
+}
+
+/**
+ * block define
+ * @param $name     block name
+ * @examples
+ *
+ *    @include b(button) { ... }  ... 就是 @content
+ *    =>
+ *    .za-button { ... }
+ *
+ *
+ *    @include b(checkbox-group) { ... }
+ *    =>
+ *    .za-checkbox-group { ... }
+ */
+ @mixin b($block) {
+    $block: selector-append($--namespace, $--block-separator + $block);
+    .#{$block} { // .za-button
+        @content;
+    }
+ }
+
+ /**
+ * element define
+ * @param $list     list of element names
+ * @examples
+ *
+ *    @include b(button) {
+ *      @include e(icon) { ... }
+ *    }
+ *    =>
+ *    .za-button__icon { ... }
+ *
+ *
+ *    @include b(dialog) {
+ *      @include e(header, footer) { ... }
+ *    }
+ *    =>
+ *    .za-dialog__header, .za-dialog__footer { ... }
+ */
+ @mixin e($elements...) { // $elements... = x, y
+     $elements: get-elements($elements); // .za-button__header
+     $selector: if(contains-modifier(&), selector-nest(&, $elements), $elements);
+     // &: .za-button--danger selector-nest: .za-button--danger .za-button__header
+     // &: .za-button selector-nest: .za-button__header
+     @at-root {
+         #{$selector} {
+             @content;
+         }
+     }
+ }
+
+ /**
+ * modifier define
+ * @param $modifier     modifier name
+ * @examples
+ *
+ *    @include b(button) {
+ *      @include m(danger) { ... }
+ *    }
+ *    =>
+ *    .za-button--danger { ... }
+ *
+ *
+ *    @include b(button) {
+ *      @include m(danger) {
+ *        @include e(content) { ... }
+ *      }
+ *    }
+ *    =>
+ *    .za-button--danger .za-button__content { ... }
+ *
+ *
+ *    @include b(button) {
+ *      @include e(content) {
+ *        @include m(danger) { ... }
+ *      }
+ *    }
+ *    =>
+ *    ..za-button__content--danger { ... }
+ */
+ @mixin m($modifier) {
+     // &: .za-button--danger $parent => .za-button--dangerza-button  => .za-button--dangerza-button--danger
+     // &: .za-button__content $parent => .za-button__content
+     $parent: if(contains-modifier(&), & + get-block(&), &);
+     $selector: selector-append($parent, $--modifier-separator + $modifier);
+     @at-root {
+         #{$selector} {
+             @content;
+         }
+     }
+ }

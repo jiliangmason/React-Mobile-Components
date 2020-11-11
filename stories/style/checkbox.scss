@@ -1,0 +1,5 @@
+@import '../../src/style/index.scss';
+
+@include b(block) {
+    margin-bottom: 16px;
+}
